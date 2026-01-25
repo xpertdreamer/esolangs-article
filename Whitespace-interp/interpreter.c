@@ -208,23 +208,23 @@ int parse_label(ParserState *parser) {
     return label;
 }
 
-void instruction_push(Interpreter* interpreter) {
+void instr_push(Interpreter* interpreter) {
     int value = parse_number(&interpreter->parser);
     st_push(interpreter->stack, value);
 }
 
-void instruction_duplicate(Interpreter* interpreter) {
+void instr_duplicate(Interpreter* interpreter) {
     int value = st_peek(interpreter->stack, 0);
     st_push(interpreter->stack, value);
 }
 
-void instruction_swap(Interpreter* interpreter) {
+void instr_swap(Interpreter* interpreter) {
     int a = st_pop(interpreter->stack);
     int b = st_pop(interpreter->stack);
     st_push(interpreter->stack, a);
     st_push(interpreter->stack, b);
 }
 
-void instruction_discard(Interpreter* interpreter) {
+void instr_discard(Interpreter* interpreter) {
     st_pop(interpreter->stack);
 }
