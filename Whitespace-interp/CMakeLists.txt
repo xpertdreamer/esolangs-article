@@ -4,4 +4,5 @@ project(Whitespace_interp C)
 set(CMAKE_C_STANDARD 17)
 
 add_executable(Whitespace_interp main.c
-        interpreter.h)
+        interpreter.h
+        interpreter.c)
