@@ -88,6 +88,7 @@ void instr_out_num(Interpreter* interpreter) {
 
 void instr_in_char(Interpreter* interpreter) {
     int address = st_pop(interpreter->stack);
+
     int c = getchar();
 
     if (c == EOF)
@@ -122,6 +123,13 @@ void fc_add_label(Interpreter* interpreter, int label, int position) {
     if (interpreter->label_count >= MAX_LABELS) {
         fprintf(stderr, "Too many labels at line %d\n", interpreter->parser.line);
         exit(EXIT_FAILURE);
+    }
+
+    for (int i = 0; i < interpreter->label_count; i++) {
+        if (interpreter->labels[i].address == label) {
+            interpreter->labels[i].position = position;
+            return;
+        }
     }
 
     interpreter->labels[interpreter->label_count].address = label;

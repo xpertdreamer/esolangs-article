@@ -10,55 +10,31 @@ void collect_labels(Interpreter* interpreter) {
     ParserState parser = interpreter->parser;
     int saved_pos = parser.position;
 
+    // Сброс
     parser.position = 0;
     parser.line = 1;
     parser.col = 1;
+    interpreter->label_count = 0;
 
     while (parser.position < parser.length) {
         char c = parse_next_char(&parser);
 
-        switch (c) {
-            case LINEFEED:
+        if (c == LINEFEED) {
+            c = parse_next_char(&parser);
+            if (c == SPACE) {
                 c = parse_next_char(&parser);
-                // Flow control
                 if (c == SPACE) {
-                    c = parse_next_char(&parser);
-                    if (c == SPACE) {
-                        // Mark label
-                        int label = parse_label(&parser);
-                        fc_add_label(interpreter, label, parser.position);
-                    }
-                    // Skip other flow operations on first pass through
-                    else
-                        parse_label(&parser);
+                    // Mark label
+                    int label = parse_label(&parser);
+                    fc_add_label(interpreter, label, parser.position);
+                    // printf("DEBUG: Found label %d at position %d\n", label, parser.position);
                 }
-                break;
-
-            case SPACE:
-                // Stack manip
-                c = parse_next_char(&parser);
-                if (c == SPACE)
-                    // Skip number
-                    parse_number(&parser);
-                break;
-
-            case TAB:
-                c = parse_next_char(&parser);
-                // Continued flow control
-                if (c == TAB) {
-                    c = parse_next_char(&parser);
-                    // Skip label with conditional jump
-                    if (c == SPACE || c == TAB)
-                        parse_label(&parser);
-                }
-                break;
-
-            default:
-                continue;
+            }
         }
     }
 
     interpreter->parser.position = saved_pos;
+    // printf("DEBUG: Collected %d labels\n", interpreter->label_count);
 }
 
 bool exec_instruction(Interpreter* interpreter) {

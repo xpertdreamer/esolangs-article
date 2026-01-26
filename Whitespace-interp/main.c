@@ -1,11 +1,11 @@
 #include "interpreter.h"
 #include <stdio.h>
-#include <stdlib.h>
 #include <getopt.h>
 
 void print_version(void);
 void print_help(const char* program_name);
 void create_test_program(const char* filename);
+// void dump_file(const char *filename);
 
 int main(const int argc, char** argv) {
     bool execute_directly = false;
@@ -64,6 +64,7 @@ int main(const int argc, char** argv) {
         load_res = interpreter_read_from_file(interpreter, filename);
     } else {
         create_test_program("test.ws");
+        // dump_file("test.ws");
         load_res = interpreter_read_from_file(interpreter, "test.ws");
     }
 
@@ -98,20 +99,95 @@ void print_help(const char* program_name) {
 }
 
 void create_test_program(const char* filename) {
-    FILE* file = fopen(filename, "w");
-    if (file == NULL) {
-        printf("Error opening file %s\n", filename);
+    FILE *file = fopen(filename, "wb");
+    if (!file) {
+        perror("Cannot create test file");
         return;
     }
 
-    // Simple program: prints "Hi"
-    /* Push 72 (H), output char, push 105 (i), output char, end */
-    fprintf(file, "   \t \t \n");      // Push 72
-    fprintf(file, "\t\n  \t \n");      // Output char
-    fprintf(file, "   \t \t\t \n");    // Push 105
-    fprintf(file, "\t\n  \t \n");      // Output char
-    fprintf(file, "\n\n\n");           // End program
+    /* Prints "Hello, World!\n"
+     *
+     * Structure of each symbol:
+     * 1. Push ASCII code of symbol
+     * 2. Output char
+     *
+     * End program
+     */
+
+    // String to output
+    const char *str = "Hello, World!\n";
+
+    for (int i = 0; str[i] != '\0'; i++) {
+        int ch = str[i];
+
+        // 1. IMP Stack + Push
+        fputc(' ', file);  // IMP: Stack
+        fputc(' ', file);  // Operation: Push
+
+        // 2. Sign
+        fputc(' ', file);  // Positive sign
+
+        // 3. ASCII code (7 bit for ASCII)
+        int value = ch;
+        int bits[32] = {0};
+        int bit_count = 0;
+
+        // Convert to binary without leading zeros
+        while (value > 0) {
+            bits[bit_count++] = value & 1;
+            value >>= 1;
+        }
+
+        // Write the bits from the most significant to the least significant
+        // If bit_count == 0 (digit 0), write one zero char
+        if (bit_count == 0) {
+            fputc(' ', file);  // 0
+        } else {
+            for (int j = bit_count - 1; j >= 0; j--) {
+                fputc(bits[j] ? '\t' : ' ', file);
+            }
+        }
+
+        // 4. End of digit
+        fputc('\n', file);
+
+        // 5. Output char
+        fputc('\t', file);  // IMP: I/O
+        fputc('\n', file);
+        fputc(' ', file);   // Operation: Output char
+        fputc(' ', file);
+    }
+
+    // End program
+    fputc('\n', file);
+    fputc('\n', file);
+    fputc('\n', file);
 
     fclose(file);
-    printf("Created test program: %s\n", filename);
+    printf("Created Hello World program: %s\n", filename);
+    printf("Will print: %s", str);
 }
+//
+// void dump_file(const char *filename) {
+//     FILE *f = fopen(filename, "rb");
+//     if (!f) return;
+//
+//     printf("Dumping file %s:\n", filename);
+//     int pos = 0;
+//     int ch;
+//     while ((ch = fgetc(f)) != EOF) {
+//         printf("%3d: ", pos++);
+//         if (ch == ' ') {
+//             printf("SPACE\n");
+//         } else if (ch == '\t') {
+//             printf("TAB\n");
+//         } else if (ch == '\n') {
+//             printf("LF\\n\n");
+//         } else {
+//             printf("'%c' (ASCII %d)\n", ch, ch);
+//         }
+//     }
+//     fclose(f);
+//     printf("\n");
+// }
+

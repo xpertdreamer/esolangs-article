@@ -132,20 +132,46 @@ int interpreter_load_str(Interpreter* interpreter, const char* source) {
     return 0;
 }
 
+// char parse_next_char(ParserState *parser) {
+//     if (parser->position >= parser->length) {
+//         return EOF;
+//     }
+//
+//     char c = parser->source[parser->position++];
+//
+//     printf("Read char: '%c' (ASCII %d) at pos %d\n",
+//         c == '\n' ? '\\n' : c == ' ' ? 'S' : c == '\t' ? 'T' : c,
+//         c, parser->position - 1);
+//
+//     if (c == LINEFEED) {
+//         parser->line++;
+//         parser->col = 1;
+//     } else
+//         parser->col++;
+//
+//     return c;
+// }
+
 char parse_next_char(ParserState *parser) {
-    if (parser->position >= parser->length) {
-        return EOF;
+    while (parser->position < parser->length) {
+        unsigned char c = parser->source[parser->position++];
+
+         // printf("DEBUG: pos=%d, char=%d ('%c')\n",
+         //        parser->position-1, c,
+         //        c == ' ' ? 'S' : c == '\t' ? 'T' : c == '\n' ? 'L' : c == '\r' ? 'R' : '.');
+
+        if (c == SPACE || c == TAB || c == LINEFEED) {
+            if (c == LINEFEED) {
+                parser->line++;
+                parser->col = 1;
+            } else {
+                parser->col++;
+            }
+            return (char)c;
+        }
     }
 
-    char c = parser->source[parser->position++];
-
-    if (c == LINEFEED) {
-        parser->line++;
-        parser->col = 1;
-    } else
-        parser->col++;
-
-    return c;
+    return EOF;
 }
 
 char parse_peek_char(ParserState *parser) {
@@ -167,26 +193,60 @@ void parse_skip_ws(ParserState *parser) {
 }
 
 int parse_number(ParserState *parser) {
+    // printf("DEBUG parse_number start: pos=%d\n", parser->position);
+
     char c = parse_next_char(parser);
+    // printf("DEBUG: sign char: %d ('%c')\n", c,
+           // c == ' ' ? 'S' : c == '\t' ? 'T' : c == '\n' ? 'L' : '.');
+
     int sign = 1;
 
-    if (c == TAB)
+    if (c == TAB) {
         sign = -1;
-    else if (c != SPACE) {
-        fprintf(stderr, "Unexpected character %c at %d %d" ,c ,parser->line ,parser->col);
+        c = parse_next_char(parser);
+        // printf("DEBUG: after - sign: %d\n", c);
+    } else if (c == SPACE) {
+        sign = 1;
+        c = parse_next_char(parser);
+        // printf("DEBUG: after + sign: %d\n", c);
+    } else {
+        fprintf(stderr, "Expected sign (space or tab) at line %d, col %d, got: '%c' (ASCII %d)\n", \
+            parser->line, parser->col, c, c);
         exit(EXIT_FAILURE);
     }
 
     int value = 0;
-    while ((c = parse_next_char(parser)) != LINEFEED) {
+    int bits_read = 0;
+
+    // printf("DEBUG: entering number loop with char: %d\n", c);
+
+    while (c != LINEFEED) {
+        // printf("DEBUG: in loop, char: %d\n", c);
+
+        if (c == EOF) {
+            fprintf(stderr, "Unexpected end of file\n");
+            exit(EXIT_FAILURE);
+        }
+
+        if (c!= SPACE && c!= TAB) {
+            fprintf(stderr, "Invalid binary digit at %d %d: expected space or tab, got '%c' (ASCII %d)\n",
+                parser->line, parser->col, c, c);
+            exit(EXIT_FAILURE);
+        }
+
         value <<= 1;
         if (c == TAB)
             value |= 1;
-        else if (c != SPACE) {
-            fprintf(stderr, "Invalid binary digit at %d %d" ,parser->line ,parser->col);
-            exit(EXIT_FAILURE);
-        }
+
+        bits_read++;
+        c = parse_next_char(parser);
     }
+
+    // printf("DEBUG: bits_read=%d, value=%d, sign=%d, result=%d\n",
+    //        bits_read, value, sign, sign * (bits_read == 0 ? 0 : value));
+
+    if (bits_read == 0)
+        return 0;
 
     return sign * value;
 }
@@ -196,13 +256,20 @@ int parse_label(ParserState *parser) {
     char c;
 
     while ((c = parse_next_char(parser)) != LINEFEED) {
+        if (c == EOF) {
+            fprintf(stderr, "Unexpected end of file\n");
+            exit(EXIT_FAILURE);
+        }
+
+        if (c != SPACE && c != TAB) {
+            fprintf(stderr, "Invalid label character at %d %d: '%c' (ASCII %d)\n",
+                parser->line, parser->col, c, c);
+            exit(EXIT_FAILURE);
+        }
+
         label <<= 1;
         if (c == TAB)
             label |= 1;
-        else if (c != SPACE) {
-            fprintf(stderr, "Invalid label character at %d %d" ,parser->line ,parser->col);
-            exit(EXIT_FAILURE);
-        }
     }
 
     return label;

@@ -30,5 +30,11 @@ void instr_out_num(Interpreter* interpreter);
 void instr_in_char(Interpreter* interpreter);
 void instr_in_num(Interpreter* interpreter);
 void fc_add_label(Interpreter* interpreter, int label, int position);
+void fc_find_label(Interpreter* interpreter, int label);
+char parse_next_char(ParserState *parser);
+char parse_peek_char(ParserState *parser);
+void parse_skip_ws(ParserState *parser);
+int parse_number(ParserState *parser);
+int parse_label(ParserState *parser);
 
 #endif //INSTRUCTION_H
