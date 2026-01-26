@@ -1,7 +1,9 @@
 //
 // Created by IWOFLEUR on 25.01.2026.
 //
-#include "interpreter.c"
+#include "interpreter.h"
+#include <stdio.h>
+#include <stdlib.h>
 
 // Arithmetics
 

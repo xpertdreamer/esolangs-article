@@ -22,7 +22,7 @@
 
 typedef struct {
     char* source;       // Source file
-    size_t length;      // Length of source code
+    long long length;      // Length of source code
     int position;       // Current position
     int line;           // Current line on interp
     int col;            // Same as line but with a column
@@ -48,6 +48,18 @@ typedef struct {
     bool running;
     ParserState parser;
 } Interpreter;
+
+Stack* st_new(int capacity);
+void st_free(Stack *stack);
+bool st_push(Stack *stack, int value);
+int st_pop(Stack *stack);
+int st_peek(Stack *stack, int offset);
+
+char parse_next_char(ParserState *parser);
+char parse_peek_char(ParserState *parser);
+void parse_skip_ws(ParserState *parser);
+int parse_number(ParserState *parser);
+int parse_label(ParserState *parser);
 
 Interpreter* interpreter_new(void);
 void interpreter_delete(Interpreter* interpreter);

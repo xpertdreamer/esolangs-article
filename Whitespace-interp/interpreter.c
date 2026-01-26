@@ -1,10 +1,10 @@
 //
 // Created by IWOFLEUR on 25.01.2026.
 //
+
+#include "interpreter.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include "interpreter.h"
-
 #include <string.h>
 
 Stack* st_new(const int capacity) {
@@ -77,7 +77,7 @@ Interpreter* interpreter_new(void) {
     return interpreter;
 }
 
-void interpreter_free(Interpreter *interpreter) {
+void interpreter_delete(Interpreter *interpreter) {
     if (interpreter == NULL) return;
 
     st_free(interpreter->stack);
