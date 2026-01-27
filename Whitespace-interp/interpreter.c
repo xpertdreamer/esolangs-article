@@ -213,8 +213,8 @@ char parse_peek_char(ParserState *parser) {
 
 void parse_skip_ws(ParserState *parser) {
     while (parser->position < parser->length) {
-        const char c = parser->source[parser->position];
-        if (c != SPACE && c != TAB && c != LINEFEED)
+        char c = parser->source[parser->position];
+        if (c == SPACE || c == TAB || c == LINEFEED)
             parser->position++;
         else
             break;
@@ -225,69 +225,49 @@ int parse_number(ParserState *parser) {
 #ifdef DEBUG
     printf("DEBUG parse_number start: pos=%d\n", parser->position);
 #endif
+
     char c = parse_next_char(parser);
-#ifdef DEBUG
-    printf("DEBUG: sign char: %d ('%c')\n", c,
-           c == ' ' ? 'S' : c == '\t' ? 'T' : c == '\n' ? 'L' : '.');
-#endif
     int sign = 1;
 
+    // Read sign
     if (c == TAB) {
         sign = -1;
-        c = parse_next_char(parser);
-#ifdef DEBUG
-        printf("DEBUG: after - sign: %d\n", c);
-#endif
     } else if (c == SPACE) {
         sign = 1;
-        c = parse_next_char(parser);
-#ifdef DEBUG
-        printf("DEBUG: after + sign: %d\n", c);
-#endif
     } else {
-        fprintf(stderr, "Expected sign (space or tab) at line %d, col %d, got: '%c' (ASCII %d)\n", \
-            parser->line, parser->col, c, c);
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "Expected sign (space or tab) at line %d, col %d, got: '%c' (ASCII %d)\n",
+                parser->line, parser->col, c, c);
+        return 0;  // Return 0 instead of exit - caller must check running flag
     }
 
+    // Read binary digits
     int value = 0;
     int bits_read = 0;
-#ifdef DEBUG
-    printf("DEBUG: entering number loop with char: %d\n", c);
-#endif
 
-    while (c != LINEFEED) {
-#ifdef DEBUG
-        printf("DEBUG: in loop, char: %d\n", c);
-#endif
-
+    while ((c = parse_next_char(parser)) != LINEFEED) {
         if (c == EOF) {
-            fprintf(stderr, "Unexpected end of file\n");
-            exit(EXIT_FAILURE);
+            fprintf(stderr, "Unexpected end of file while parsing number at line %d\n",
+                    parser->line);
+            return 0;
         }
 
-        if (c!= SPACE && c!= TAB) {
-            fprintf(stderr, "Invalid binary digit at %d %d: expected space or tab, got '%c' (ASCII %d)\n",
-                parser->line, parser->col, c, c);
-            exit(EXIT_FAILURE);
+        if (c != SPACE && c != TAB) {
+            fprintf(stderr, "Invalid binary digit at line %d, col %d: expected space or tab, got '%c' (ASCII %d)\n",
+                    parser->line, parser->col, c, c);
+            return 0;
         }
 
         value <<= 1;
-        if (c == TAB)
-            value |= 1;
-
+        if (c == TAB) value |= 1;
         bits_read++;
-        c = parse_next_char(parser);
     }
+
 #ifdef DEBUG
     printf("DEBUG: bits_read=%d, value=%d, sign=%d, result=%d\n",
            bits_read, value, sign, sign * (bits_read == 0 ? 0 : value));
 #endif
 
-    if (bits_read == 0)
-        return 0;
-
-    return sign * value;
+    return (bits_read == 0) ? 0 : sign * value;
 }
 
 int parse_label(ParserState *parser) {
@@ -296,19 +276,19 @@ int parse_label(ParserState *parser) {
 
     while ((c = parse_next_char(parser)) != LINEFEED) {
         if (c == EOF) {
-            fprintf(stderr, "Unexpected end of file\n");
-            exit(EXIT_FAILURE);
+            fprintf(stderr, "Unexpected end of file while parsing label at line %d\n",
+                    parser->line);
+            return -1;
         }
 
         if (c != SPACE && c != TAB) {
-            fprintf(stderr, "Invalid label character at %d %d: '%c' (ASCII %d)\n",
-                parser->line, parser->col, c, c);
-            exit(EXIT_FAILURE);
+            fprintf(stderr, "Invalid label character at line %d, col %d: '%c' (ASCII %d)\n",
+                    parser->line, parser->col, c, c);
+            return -1;
         }
 
         label <<= 1;
-        if (c == TAB)
-            label |= 1;
+        if (c == TAB) label |= 1;
     }
 
     return label;
@@ -316,15 +296,28 @@ int parse_label(ParserState *parser) {
 
 void instr_push(Interpreter* interpreter) {
     int value = parse_number(&interpreter->parser);
+    if (interpreter->running == false) return;
     st_push(interpreter->stack, value);
 }
 
 void instr_duplicate(Interpreter* interpreter) {
+    if (interpreter->stack->top < 0) {
+        fprintf(stderr, "Duplicate: stack underflow at line %d\n",
+                interpreter->parser.line);
+        interpreter->running = false;
+        return;
+    }
     int value = st_peek(interpreter->stack, 0);
     st_push(interpreter->stack, value);
 }
 
 void instr_swap(Interpreter* interpreter) {
+    if (interpreter->stack->top < 1) {
+        fprintf(stderr, "Swap: stack underflow at line %d\n",
+                interpreter->parser.line);
+        interpreter->running = false;
+        return;
+    }
     int a = st_pop(interpreter->stack);
     int b = st_pop(interpreter->stack);
     st_push(interpreter->stack, a);
@@ -332,5 +325,11 @@ void instr_swap(Interpreter* interpreter) {
 }
 
 void instr_discard(Interpreter* interpreter) {
+    if (interpreter->stack->top < 0) {
+        fprintf(stderr, "Discard: stack underflow at line %d\n",
+                interpreter->parser.line);
+        interpreter->running = false;
+        return;
+    }
     st_pop(interpreter->stack);
 }

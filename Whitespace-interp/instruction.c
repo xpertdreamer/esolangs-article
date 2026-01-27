@@ -303,7 +303,7 @@ void instr_in_num(Interpreter* interpreter) {
     }
 
 #ifdef DEBUG
-    printf("%d\n", sign * value);
+    printf("[DEBUG]%d\n", sign * value);
 #endif
 
     interpreter->heap[address] = sign * value;

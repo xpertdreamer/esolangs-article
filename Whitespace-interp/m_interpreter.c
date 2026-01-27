@@ -244,30 +244,37 @@ void collect_labels(Interpreter* interpreter) {
     interpreter->parser.col = 1;
     interpreter->label_count = 0;
 
-    // Scan for all [L][S][S] mark instructions
-    while (interpreter->parser.position < interpreter->parser.length) {
-        InstructionSequence seq = {0};
+    // First pass: collect all labels
+    while (interpreter->parser.position < interpreter->parser.length &&
+           interpreter->running) {
+        char first = parse_next_char(&interpreter->parser);
 
-        seq.first = parse_next_char(&interpreter->parser);
+        if (first == LINEFEED) {
+            char second = parse_next_char(&interpreter->parser);
 
-        if (seq.first == LINEFEED) {
-            seq.second = parse_next_char(&interpreter->parser);
+            if (second == SPACE) {
+                char third = parse_next_char(&interpreter->parser);
 
-            if (seq.second == SPACE) {
-                seq.third = parse_next_char(&interpreter->parser);
-
-                if (seq.third == SPACE) {
-                    // Found a mark label instruction
+                if (third == SPACE) {
+                    // Found a label definition
                     int label = parse_label(&interpreter->parser);
-                    fc_add_label(interpreter, label, interpreter->parser.position);
+                    if (label >= 0) {  // Valid label
+                        fc_add_label(interpreter, label,
+                                    interpreter->parser.position);
 
 #ifdef DEBUG
-                    printf("DEBUG: Found label %d at position %d\n",
-                           label, interpreter->parser.position);
+                        printf("DEBUG: Collected label %d at position %d\n",
+                               label, interpreter->parser.position);
 #endif
+                    }
+                } else {
+                    // Not a label instruction, skip ahead
+                    // Back up to reparse properly in execution phase
+                    interpreter->parser.position -= 1; // Back over 'third'
                 }
             }
         }
+        // Skip non-label instructions during label collection
     }
 
     // Restore original parser state
@@ -277,8 +284,61 @@ void collect_labels(Interpreter* interpreter) {
 
 #ifdef DEBUG
     printf("DEBUG: Collected %d labels\n", interpreter->label_count);
+    for (int i = 0; i < interpreter->label_count; i++) {
+        printf("  Label %d -> Position %d\n",
+               interpreter->labels[i].address,
+               interpreter->labels[i].position);
+    }
 #endif
 }
+
+// void collect_labels(Interpreter* interpreter) {
+//     // Save current parser state
+//     int saved_pos = interpreter->parser.position;
+//     int saved_line = interpreter->parser.line;
+//     int saved_col = interpreter->parser.col;
+//
+//     // Reset to beginning
+//     interpreter->parser.position = 0;
+//     interpreter->parser.line = 1;
+//     interpreter->parser.col = 1;
+//     interpreter->label_count = 0;
+//
+//     // Scan for all [L][S][S] mark instructions
+//     while (interpreter->parser.position < interpreter->parser.length) {
+//         InstructionSequence seq = {0};
+//
+//         seq.first = parse_next_char(&interpreter->parser);
+//
+//         if (seq.first == LINEFEED) {
+//             seq.second = parse_next_char(&interpreter->parser);
+//
+//             if (seq.second == SPACE) {
+//                 seq.third = parse_next_char(&interpreter->parser);
+//
+//                 if (seq.third == SPACE) {
+//                     // Found a mark label instruction
+//                     int label = parse_label(&interpreter->parser);
+//                     fc_add_label(interpreter, label, interpreter->parser.position);
+//
+// #ifdef DEBUG
+//                     printf("DEBUG: Found label %d at position %d\n",
+//                            label, interpreter->parser.position);
+// #endif
+//                 }
+//             }
+//         }
+//     }
+//
+//     // Restore original parser state
+//     interpreter->parser.position = saved_pos;
+//     interpreter->parser.line = saved_line;
+//     interpreter->parser.col = saved_col;
+//
+// #ifdef DEBUG
+//     printf("DEBUG: Collected %d labels\n", interpreter->label_count);
+// #endif
+// }
 
 void interpreter_run(Interpreter* interpreter) {
     if (!interpreter->parser.source) {
