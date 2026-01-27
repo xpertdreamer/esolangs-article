@@ -5,9 +5,13 @@
 void print_version(void);
 void print_help(const char* program_name);
 void create_test_program(const char* filename);
-// void dump_file(const char *filename);
+void create_simple_test_program(const char* filename);
+void dump_file(const char *filename);
 
 int main(const int argc, char** argv) {
+    setvbuf(stdin, NULL, _IONBF, 0);
+    setvbuf(stdout, NULL, _IONBF, 0);
+
     bool execute_directly = false;
     const char* filename = NULL;
     const char* direct_code = NULL;
@@ -62,8 +66,10 @@ int main(const int argc, char** argv) {
         load_res = interpreter_load_str(interpreter, direct_code);
     } else if (filename) {
         load_res = interpreter_read_from_file(interpreter, filename);
+        // dump_file(filename);
     } else {
         create_test_program("test.ws");
+        // create_simple_test_program("test.ws");
         // dump_file("test.ws");
         load_res = interpreter_read_from_file(interpreter, "test.ws");
     }
@@ -75,7 +81,9 @@ int main(const int argc, char** argv) {
     }
 
     interpreter_run(interpreter);
-
+    if (ferror(stdin)) {
+        fprintf(stderr, "Error reading from stdin\n");
+    }
 
     interpreter_delete(interpreter);
     return 0;
@@ -167,27 +175,41 @@ void create_test_program(const char* filename) {
     printf("Created Hello World program: %s\n", filename);
     printf("Will print: %s", str);
 }
-//
-// void dump_file(const char *filename) {
-//     FILE *f = fopen(filename, "rb");
-//     if (!f) return;
-//
-//     printf("Dumping file %s:\n", filename);
-//     int pos = 0;
-//     int ch;
-//     while ((ch = fgetc(f)) != EOF) {
-//         printf("%3d: ", pos++);
-//         if (ch == ' ') {
-//             printf("SPACE\n");
-//         } else if (ch == '\t') {
-//             printf("TAB\n");
-//         } else if (ch == '\n') {
-//             printf("LF\\n\n");
-//         } else {
-//             printf("'%c' (ASCII %d)\n", ch, ch);
-//         }
-//     }
-//     fclose(f);
-//     printf("\n");
-// }
 
+void dump_file(const char *filename) {
+    FILE *f = fopen(filename, "rb");
+    if (!f) return;
+
+    printf("Dumping file %s:\n", filename);
+    int pos = 0;
+    int ch;
+    while ((ch = fgetc(f)) != EOF) {
+        printf("%3d: ", pos++);
+        if (ch == ' ') {
+            printf("S\n");
+        } else if (ch == '\t') {
+            printf("T\n");
+        } else if (ch == '\n') {
+            printf("L\\n\n");
+        } else {
+            printf("'%c' (ASCII %d)\n", ch, ch);
+        }
+    }
+    fclose(f);
+    printf("\n");
+}
+
+void create_simple_test_program(const char* filename) {
+    FILE *file = fopen(filename, "wb");
+    // [SPACE][SPACE][SPACE][LF] = push 0
+    // [SPACE][SPACE][TAB][LF] = push 1
+    // [TAB][SPACE][SPACE][SPACE] = add
+    // [TAB][LF][SPACE][TAB] = out_num
+    // [LF][LF][LF] = end
+    fputs("   \n", file);  // push 0
+    fputs("  \t\n", file); // push 1
+    fputs("\t   ", file);  // add
+    fputs("\t\n \t", file); // out_num
+    fputs("\n\n\n", file); // end
+    fclose(file);
+}

@@ -42,7 +42,7 @@ bool st_push(Stack *stack, const int value) {
 
 int st_pop(Stack *stack) {
     if (stack->top < 0) {
-        fprintf(stderr, "Stack underflow\n");
+        fprintf(stderr, "Stack underflow - empty\n");
         exit(EXIT_FAILURE);
     }
 
@@ -155,11 +155,11 @@ int interpreter_load_str(Interpreter* interpreter, const char* source) {
 char parse_next_char(ParserState *parser) {
     while (parser->position < parser->length) {
         unsigned char c = parser->source[parser->position++];
-
-         // printf("DEBUG: pos=%d, char=%d ('%c')\n",
-         //        parser->position-1, c,
-         //        c == ' ' ? 'S' : c == '\t' ? 'T' : c == '\n' ? 'L' : c == '\r' ? 'R' : '.');
-
+#ifdef DEBUG
+         printf("DEBUG: pos=%d, char=%d ('%c')\n",
+                parser->position-1, c,
+                c == ' ' ? 'S' : c == '\t' ? 'T' : c == '\n' ? 'L' : c == '\r' ? 'R' : '.');
+#endif
         if (c == SPACE || c == TAB || c == LINEFEED) {
             if (c == LINEFEED) {
                 parser->line++;
@@ -193,22 +193,28 @@ void parse_skip_ws(ParserState *parser) {
 }
 
 int parse_number(ParserState *parser) {
-    // printf("DEBUG parse_number start: pos=%d\n", parser->position);
-
+#ifdef DEBUG
+    printf("DEBUG parse_number start: pos=%d\n", parser->position);
+#endif
     char c = parse_next_char(parser);
-    // printf("DEBUG: sign char: %d ('%c')\n", c,
-           // c == ' ' ? 'S' : c == '\t' ? 'T' : c == '\n' ? 'L' : '.');
-
+#ifdef DEBUG
+    printf("DEBUG: sign char: %d ('%c')\n", c,
+           c == ' ' ? 'S' : c == '\t' ? 'T' : c == '\n' ? 'L' : '.');
+#endif
     int sign = 1;
 
     if (c == TAB) {
         sign = -1;
         c = parse_next_char(parser);
-        // printf("DEBUG: after - sign: %d\n", c);
+#ifdef DEBUG
+        printf("DEBUG: after - sign: %d\n", c);
+#endif
     } else if (c == SPACE) {
         sign = 1;
         c = parse_next_char(parser);
-        // printf("DEBUG: after + sign: %d\n", c);
+#ifdef DEBUG
+        printf("DEBUG: after + sign: %d\n", c);
+#endif
     } else {
         fprintf(stderr, "Expected sign (space or tab) at line %d, col %d, got: '%c' (ASCII %d)\n", \
             parser->line, parser->col, c, c);
@@ -217,11 +223,14 @@ int parse_number(ParserState *parser) {
 
     int value = 0;
     int bits_read = 0;
-
-    // printf("DEBUG: entering number loop with char: %d\n", c);
+#ifdef DEBUG
+    printf("DEBUG: entering number loop with char: %d\n", c);
+#endif
 
     while (c != LINEFEED) {
-        // printf("DEBUG: in loop, char: %d\n", c);
+#ifdef DEBUG
+        printf("DEBUG: in loop, char: %d\n", c);
+#endif
 
         if (c == EOF) {
             fprintf(stderr, "Unexpected end of file\n");
@@ -241,9 +250,10 @@ int parse_number(ParserState *parser) {
         bits_read++;
         c = parse_next_char(parser);
     }
-
-    // printf("DEBUG: bits_read=%d, value=%d, sign=%d, result=%d\n",
-    //        bits_read, value, sign, sign * (bits_read == 0 ? 0 : value));
+#ifdef DEBUG
+    printf("DEBUG: bits_read=%d, value=%d, sign=%d, result=%d\n",
+           bits_read, value, sign, sign * (bits_read == 0 ? 0 : value));
+#endif
 
     if (bits_read == 0)
         return 0;
