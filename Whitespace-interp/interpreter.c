@@ -3,6 +3,7 @@
 //
 
 #include "interpreter.h"
+#include "config.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -42,8 +43,9 @@ bool st_push(Stack *stack, const int value) {
 
 int st_pop(Stack *stack) {
     if (stack->top < 0) {
-        fprintf(stderr, "Stack underflow - empty\n");
-        exit(EXIT_FAILURE);
+        // fprintf(stderr, "Stack underflow - empty\n");
+        // exit(EXIT_FAILURE);
+        return 0;
     }
 
     return stack->data[stack->top--];
@@ -51,24 +53,51 @@ int st_pop(Stack *stack) {
 
 int st_peek(Stack *stack, const int offset) {
     if (stack->top - offset < 0) {
-        fprintf(stderr, "Stack: Out of bounds\n");
-        exit(EXIT_FAILURE);
+        // fprintf(stderr, "Stack: Out of bounds\n");
+        // exit(EXIT_FAILURE);
+        return 0;
     }
 
     return stack->data[stack->top - offset];
 }
 
 Interpreter* interpreter_new(void) {
-    Interpreter *interpreter = (Interpreter *)malloc(sizeof(Interpreter));
+    Interpreter *interpreter = malloc(sizeof(Interpreter));
+    if (!interpreter) return NULL;
+
+    // Initialize to NULL for safe cleanup
+    interpreter->stack = NULL;
+    interpreter->heap = NULL;
+    interpreter->labels = NULL;
+    interpreter->call_stack = NULL;
+    interpreter->parser.source = NULL;
 
     interpreter->stack = st_new(STACK_SIZE);
-    interpreter->heap = calloc(HEAP_SIZE, sizeof(int));
-    interpreter->labels = malloc(MAX_LABELS * sizeof(Label));
-    interpreter->label_count = 0;
-    interpreter->call_stack = st_new(CALL_STACK_SIZE);
-    interpreter->running = true;
+    if (!interpreter->stack) {
+        interpreter_delete(interpreter);
+        return NULL;
+    }
 
-    interpreter->parser.source = NULL;
+    interpreter->heap = calloc(HEAP_SIZE, sizeof(int));
+    if (!interpreter->heap) {
+        interpreter_delete(interpreter);
+        return NULL;
+    }
+
+    interpreter->labels = malloc(MAX_LABELS * sizeof(Label));
+    if (!interpreter->labels) {
+        interpreter_delete(interpreter);
+        return NULL;
+    }
+
+    interpreter->call_stack = st_new(CALL_STACK_SIZE);
+    if (!interpreter->call_stack) {
+        interpreter_delete(interpreter);
+        return NULL;
+    }
+
+    interpreter->label_count = 0;
+    interpreter->running = true;
     interpreter->parser.length = 0;
     interpreter->parser.position = 0;
     interpreter->parser.line = 1;

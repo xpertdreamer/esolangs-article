@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include "interpreter.h"
 #include "instruction.h"
+#include "config.h"
 
 // Instruction Modification Parameter (IMP)
 typedef struct {

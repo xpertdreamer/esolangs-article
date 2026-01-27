@@ -8,4 +8,5 @@ add_executable(Whitespace_interp main.c
         interpreter.c
         instruction.c
         m_interpreter.c
-        instruction.h)
+        instruction.h
+        config.h)
