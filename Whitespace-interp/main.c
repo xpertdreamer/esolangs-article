@@ -66,11 +66,9 @@ int main(const int argc, char** argv) {
         load_res = interpreter_load_str(interpreter, direct_code);
     } else if (filename) {
         load_res = interpreter_read_from_file(interpreter, filename);
-        // dump_file(filename);
     } else {
         create_test_program("test.ws");
-        // create_simple_test_program("test.ws");
-        // dump_file("test.ws");
+        dump_file("test.ws");
         load_res = interpreter_read_from_file(interpreter, "test.ws");
     }
 
