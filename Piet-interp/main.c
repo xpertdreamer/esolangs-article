@@ -1,6 +1,9 @@
-#include <stdio.h>
+//
+// Created by IWOFLEUR on 28.01.2026.
+//
 
-int main(void) {
+int main(int argc, char** argv) {
+
 
     return 0;
 }
