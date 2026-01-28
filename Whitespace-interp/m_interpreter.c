@@ -1,242 +1,135 @@
 //
 // Created by IWOFLEUR on 26.01.2026.
 //
+#include <stdint.h>
 #include <stdio.h>
+
 #include "interpreter.h"
 #include "instruction.h"
 #include "config.h"
 
-// Instruction Modification Parameter (IMP)
+#define INSTR_COUNT (sizeof(instruction_table) / sizeof(instruction_table[0]))
+
 typedef struct {
+    uint8_t len;                        // length of signature
+    char sig[4];                        // SPACE / TAB / LINEFEED
+    void (*handler)(Interpreter*);
+    bool has_param;                     // Does this instruction have a parameter?
+} Instruction;
+
+static const Instruction instruction_table[] = {
+    // STACK
+    {2, {SPACE,     SPACE},                             instr_push,             true},    // Push number
+    {3, {SPACE,     TAB,        SPACE},                 instr_copy,             true},    // Copy nth item (ADDED)
+    {3, {SPACE,     TAB,        LINEFEED},              instr_slide,            true},    // Slide n items (ADDED)
+    {3, {SPACE,     LINEFEED,   SPACE},                 instr_duplicate,        false},
+    {3, {SPACE,     LINEFEED,   TAB},                   instr_swap,             false},
+    {3, {SPACE,     LINEFEED,   LINEFEED},              instr_discard,          false},
+
+    // ARITHMETIC
+    {4, {TAB,       SPACE,      SPACE,      SPACE},     instr_add,              false},
+    {4, {TAB,       SPACE,      SPACE,      TAB},       instr_sub,              false},
+    {4, {TAB,       SPACE,      SPACE,      LINEFEED},  instr_mul,              false},
+    {4, {TAB,       SPACE,      TAB,        SPACE},     instr_div,              false},
+    {4, {TAB,       SPACE,      TAB,        TAB},       instr_mod,              false},
+
+    // HEAP
+    {3, {TAB,       TAB,        SPACE},                 instr_heap_store,       false},
+    {3, {TAB,       TAB,        TAB},                   instr_heap_retrieve,    false},
+
+    // I/O
+    {4, {TAB,       LINEFEED,   SPACE,      SPACE},     instr_out_char,         false},
+    {4, {TAB,       LINEFEED,   SPACE,      TAB},       instr_out_num,          false},
+    {4, {TAB,       LINEFEED,   TAB,        SPACE},     instr_in_char,          false},
+    {4, {TAB,       LINEFEED,   TAB,        TAB},       instr_in_num,           false},
+
+    // FLOW
+    {3, {LINEFEED,  SPACE,      SPACE},                 instr_mark,             true},    // Has label param
+    {3, {LINEFEED,  SPACE,      TAB},                   instr_call_subroutine,  true},
+    {3, {LINEFEED,  SPACE,      LINEFEED},              instr_jump,             true},
+    {3, {LINEFEED,  TAB,        SPACE},                 instr_jump_if_zero,     true},
+    {3, {LINEFEED,  TAB,        TAB},                   instr_jump_if_neg,      true},
+    {3, {LINEFEED,  TAB,        LINEFEED},              instr_ret,              false},
+    {3, {LINEFEED,  LINEFEED,   LINEFEED},              instr_end,              false},
+};
+
+// Helper to save/restore parser state
+typedef struct {
+    int position;
+    int line;
+    int col;
+} ParserStateBackup;
+
+static ParserStateBackup save_parser_state(ParserState *p) {
+    return (ParserStateBackup){p->position, p->line, p->col};
+}
+
+static void restore_parser_state(ParserState *p, ParserStateBackup backup) {
+    p->position = backup.position;
+    p->line = backup.line;
+    p->col = backup.col;
+}
+
+bool exec_instruction(Interpreter *interpreter) {
+    ParserState *p = &interpreter->parser;
+
+    // Save starting position in case we need to backtrack
+    ParserStateBackup start_state = save_parser_state(p);
+
+    // Read first meaningful character (skip comments)
     char first;
-    char second;
-    char third;
-    char fourth;
-} InstructionSequence;
+    do {
+        first = parse_next_char(p);
+        if (first == EOF) return false;
+    } while (first != SPACE && first != TAB && first != LINEFEED);
 
-bool exec_instruction(Interpreter* interpreter) {
-#ifdef DEBUG
-    static int instr_count = 0;
-    printf("\n[DEBUG] Position=%d, Stack top=%d, Instr=%d\n",
-           interpreter->parser.position,
-           interpreter->stack->top,
-           instr_count++);
-#endif
+    // Try each instruction that starts with this character
+    for (size_t i = 0; i < INSTR_COUNT; i++) {
+        const Instruction *ins = &instruction_table[i];
 
-    InstructionSequence seq = {0};
+        if (ins->sig[0] != first) continue;
 
-    // Read first character, skip comments
-    seq.first = parse_next_char(&interpreter->parser);
-    while (seq.first != SPACE && seq.first != TAB && seq.first != LINEFEED && seq.first != EOF) {
-        seq.first = parse_next_char(&interpreter->parser);
-    }
+        // Restore to after first character
+        restore_parser_state(p, start_state);
+        parse_next_char(p);  // Re-read first char
 
-    if (seq.first == EOF) {
-        return false;
-    }
-
-    // STACK MANIPULATION: [SPACE]...
-    if (seq.first == SPACE) {
-        seq.second = parse_next_char(&interpreter->parser);
-
-        if (seq.second == SPACE) {
-            // [S][S][number] - Push
-            instr_push(interpreter);
-
-        } else if (seq.second == TAB) {
-            seq.third = parse_next_char(&interpreter->parser);
-
-            if (seq.third == SPACE) {
-                // [S][T][S][number] - Copy nth item
-                int n = parse_number(&interpreter->parser);
-                if (interpreter->stack->top - n < 0) {
-                    fprintf(stderr, "Copy: stack underflow at line %d\n",
-                            interpreter->parser.line);
-                    interpreter->running = false;
-                    return false;
-                }
-                int value = st_peek(interpreter->stack, n);
-                st_push(interpreter->stack, value);
-
-            } else if (seq.third == LINEFEED) {
-                // [S][T][L][number] - Slide n items off stack
-                int n = parse_number(&interpreter->parser);
-                if (interpreter->stack->top < 0) {
-                    fprintf(stderr, "Slide: stack underflow at line %d\n",
-                            interpreter->parser.line);
-                    interpreter->running = false;
-                    return false;
-                }
-                int top = st_pop(interpreter->stack);
-                interpreter->stack->top -= n;
-                if (interpreter->stack->top < -1) {
-                    interpreter->stack->top = -1;
-                }
-                st_push(interpreter->stack, top);
-            }
-
-        } else if (seq.second == LINEFEED) {
-            seq.third = parse_next_char(&interpreter->parser);
-
-            if (seq.third == SPACE) {
-                // [S][L][S] - Duplicate top item
-                instr_duplicate(interpreter);
-
-            } else if (seq.third == TAB) {
-                // [S][L][T] - Swap top two items
-                instr_swap(interpreter);
-
-            } else if (seq.third == LINEFEED) {
-                // [S][L][L] - Discard top item
-                instr_discard(interpreter);
+        // Try to match the full signature
+        bool match = true;
+        for (int j = 1; j < ins->len; j++) {
+            char c = parse_next_char(p);
+            if (c != ins->sig[j]) {
+                match = false;
+                break;
             }
         }
 
-        return interpreter->running;
-    }
-    // ARITHMETIC, HEAP, I/O: [TAB]...
-    if (seq.first == TAB) {
-        seq.second = parse_next_char(&interpreter->parser);
-
-        // ------------------------------------------------------------------------
-        // ARITHMETIC: [T][S]...
-        // ------------------------------------------------------------------------
-        if (seq.second == SPACE) {
-            seq.third = parse_next_char(&interpreter->parser);
-
-            if (seq.third == SPACE) {
-                seq.fourth = parse_next_char(&interpreter->parser);
-
-                if (seq.fourth == SPACE) {
-                    // [T][S][S][S] - Addition
-                    instr_add(interpreter);
-
-                } else if (seq.fourth == TAB) {
-                    // [T][S][S][T] - Subtraction
-                    instr_sub(interpreter);
-
-                } else if (seq.fourth == LINEFEED) {
-                    // [T][S][S][L] - Multiplication
-                    instr_mul(interpreter);
-                }
-
-            } else if (seq.third == TAB) {
-                seq.fourth = parse_next_char(&interpreter->parser);
-
-                if (seq.fourth == SPACE) {
-                    // [T][S][T][S] - Integer division
-                    instr_div(interpreter);
-
-                } else if (seq.fourth == TAB) {
-                    // [T][S][T][T] - Modulo
-                    instr_mod(interpreter);
-                }
-            }
+        if (match) {
+            // Success - execute the instruction
+            ins->handler(interpreter);
+            return interpreter->running;
         }
-
-        // HEAP ACCESS: [T][T]...
-        else if (seq.second == TAB) {
-            seq.third = parse_next_char(&interpreter->parser);
-
-            if (seq.third == SPACE) {
-                // [T][T][S] - Store to heap
-                instr_heap_store(interpreter);
-
-            } else if (seq.third == TAB) {
-                // [T][T][T] - Retrieve from heap
-                instr_heap_retrieve(interpreter);
-            }
-        }
-
-        // I/O: [T][L]...
-        else if (seq.second == LINEFEED) {
-            seq.third = parse_next_char(&interpreter->parser);
-
-            if (seq.third == SPACE) {
-                seq.fourth = parse_next_char(&interpreter->parser);
-
-                if (seq.fourth == SPACE) {
-                    // [T][L][S][S] - Output character
-                    instr_out_char(interpreter);
-
-                } else if (seq.fourth == TAB) {
-                    // [T][L][S][T] - Output number
-                    instr_out_num(interpreter);
-                }
-
-            } else if (seq.third == TAB) {
-                seq.fourth = parse_next_char(&interpreter->parser);
-
-                if (seq.fourth == SPACE) {
-                    // [T][L][T][S] - Read character
-                    instr_in_char(interpreter);
-
-                } else if (seq.fourth == TAB) {
-                    // [T][L][T][T] - Read number
-                    instr_in_num(interpreter);
-                }
-            }
-        }
-
-        return interpreter->running;
     }
 
-    // FLOW CONTROL: [LINEFEED]...
-    if (seq.first == LINEFEED) {
-        seq.second = parse_next_char(&interpreter->parser);
+    // No instruction matched - restore and error
+    restore_parser_state(p, start_state);
 
-        if (seq.second == SPACE) {
-            seq.third = parse_next_char(&interpreter->parser);
+    // Skip the problematic character so we don't loop
+    parse_next_char(p);
 
-            if (seq.third == SPACE) {
-                // [L][S][S][label] - Mark a location
-                instr_mark(interpreter);
+    fprintf(stderr, "Unknown instruction at line %d (char: ", p->line);
+    if (first == SPACE) fprintf(stderr, "SPACE");
+    else if (first == TAB) fprintf(stderr, "TAB");
+    else if (first == LINEFEED) fprintf(stderr, "LINEFEED");
+    else fprintf(stderr, "%c", first);
+    fprintf(stderr, ")\n");
 
-            } else if (seq.third == TAB) {
-                // [L][S][T][label] - Call subroutine
-                instr_call_subroutine(interpreter);
-
-            } else if (seq.third == LINEFEED) {
-                // [L][S][L][label] - Jump unconditionally
-                instr_jump(interpreter);
-            }
-
-        } else if (seq.second == TAB) {
-            seq.third = parse_next_char(&interpreter->parser);
-
-            if (seq.third == SPACE) {
-                // [L][T][S][label] - Jump if top of stack is zero
-                instr_jump_if_zero(interpreter);
-
-            } else if (seq.third == TAB) {
-                // [L][T][T][label] - Jump if top of stack is negative
-                instr_jump_if_neg(interpreter);
-
-            } else if (seq.third == LINEFEED) {
-                // [L][T][L] - Return from subroutine
-                instr_ret(interpreter);
-            }
-
-        } else if (seq.second == LINEFEED) {
-            // [L][L][L] - End program
-            instr_end(interpreter);
-        }
-
-        return interpreter->running;
-    }
-
-    // UNKNOWN INSTRUCTION
-    fprintf(stderr, "Unexpected character: %c (ASCII %d) at line %d\n",
-            seq.first, seq.first, interpreter->parser.line);
     interpreter->running = false;
     return false;
 }
 
 void collect_labels(Interpreter* interpreter) {
     // Save current parser state
-    int saved_pos = interpreter->parser.position;
-    int saved_line = interpreter->parser.line;
-    int saved_col = interpreter->parser.col;
+    ParserStateBackup saved_state = save_parser_state(&interpreter->parser);
 
     // Reset to beginning
     interpreter->parser.position = 0;
@@ -245,100 +138,117 @@ void collect_labels(Interpreter* interpreter) {
     interpreter->label_count = 0;
 
     // First pass: collect all labels
-    while (interpreter->parser.position < interpreter->parser.length &&
-           interpreter->running) {
-        char first = parse_next_char(&interpreter->parser);
+    while (interpreter->parser.position < interpreter->parser.length) {
+        ParserStateBackup start_state = save_parser_state(&interpreter->parser);
 
+        // Read first character
+        char first = parse_next_char(&interpreter->parser);
+        if (first == EOF) break;
+
+        // Skip non-whitespace (comments)
+        while (first != SPACE && first != TAB && first != LINEFEED && first != EOF) {
+            first = parse_next_char(&interpreter->parser);
+        }
+
+        if (first == EOF) break;
+
+        // Check if it's a label definition [L][S][S]
         if (first == LINEFEED) {
+            ParserStateBackup before_second = save_parser_state(&interpreter->parser);
             char second = parse_next_char(&interpreter->parser);
 
+            // Skip comments between LINEFEED and second char
+            while (second != SPACE && second != TAB && second != LINEFEED && second != EOF) {
+                second = parse_next_char(&interpreter->parser);
+            }
+
             if (second == SPACE) {
+                ParserStateBackup before_third = save_parser_state(&interpreter->parser);
                 char third = parse_next_char(&interpreter->parser);
 
-                if (third == SPACE) {
-                    // Found a label definition
-                    int label = parse_label(&interpreter->parser);
-                    if (label >= 0) {  // Valid label
-                        fc_add_label(interpreter, label,
-                                    interpreter->parser.position);
-
-#ifdef DEBUG
-                        printf("DEBUG: Collected label %d at position %d\n",
-                               label, interpreter->parser.position);
-#endif
-                    }
-                } else {
-                    // Not a label instruction, skip ahead
-                    // Back up to reparse properly in execution phase
-                    interpreter->parser.position -= 1; // Back over 'third'
+                // Skip comments
+                while (third != SPACE && third != TAB && third != LINEFEED && third != EOF) {
+                    third = parse_next_char(&interpreter->parser);
                 }
+
+                if (third == SPACE) {
+                    // Found a label definition [L][S][S]
+                    // Parse the label
+                    int label = parse_label(&interpreter->parser);
+                    if (label >= 0) {
+                        // Label position should be where execution continues
+                        // after parsing the entire label instruction
+                        fc_add_label(interpreter, label, interpreter->parser.position);
+                    }
+                    continue; // Continue to next instruction
+                } else {
+                    // Not a label, restore and skip this instruction
+                    restore_parser_state(&interpreter->parser, before_third);
+                }
+            } else {
+                // Not a label, restore and skip this instruction
+                restore_parser_state(&interpreter->parser, before_second);
             }
         }
-        // Skip non-label instructions during label collection
+
+        // If not a label definition, skip this instruction
+        // Restore to start and use exec_instruction to skip
+        restore_parser_state(&interpreter->parser, start_state);
+
+        // Try to match and skip any instruction
+        bool skipped = false;
+        for (size_t i = 0; i < INSTR_COUNT; i++) {
+            const Instruction *ins = &instruction_table[i];
+
+            ParserStateBackup try_state = save_parser_state(&interpreter->parser);
+
+            // Try to match the signature
+            bool match = true;
+            for (int j = 0; j < ins->len; j++) {
+                char c = parse_next_char(&interpreter->parser);
+                if (c != ins->sig[j]) {
+                    match = false;
+                    break;
+                }
+            }
+
+            if (match) {
+                // Skip parameter if instruction has one
+                if (ins->has_param) {
+                    if (ins->sig[0] == SPACE && ins->sig[1] == SPACE) {
+                        // Push - skip number
+                        parse_number(&interpreter->parser);
+                    } else if (ins->sig[0] == SPACE && ins->sig[1] == TAB) {
+                        // Copy or Slide - skip number
+                        parse_number(&interpreter->parser);
+                    } else if (ins->sig[0] == LINEFEED &&
+                               ins->sig[1] == SPACE &&
+                               ins->sig[2] != LINEFEED) {
+                        // Flow control with label - skip label
+                        parse_label(&interpreter->parser);
+                    } else if (ins->sig[0] == LINEFEED &&
+                               ins->sig[1] == TAB &&
+                               ins->sig[2] != LINEFEED) {
+                        // Jump if zero/negative - skip label
+                        parse_label(&interpreter->parser);
+                    }
+                }
+                skipped = true;
+                break;
+            } else {
+                restore_parser_state(&interpreter->parser, try_state);
+            }
+        }
+
+        if (!skipped) {
+            // Couldn't skip - move forward one char to avoid infinite loop
+            parse_next_char(&interpreter->parser);
+        }
     }
 
     // Restore original parser state
-    interpreter->parser.position = saved_pos;
-    interpreter->parser.line = saved_line;
-    interpreter->parser.col = saved_col;
-
-#ifdef DEBUG
-    printf("DEBUG: Collected %d labels\n", interpreter->label_count);
-    for (int i = 0; i < interpreter->label_count; i++) {
-        printf("  Label %d -> Position %d\n",
-               interpreter->labels[i].address,
-               interpreter->labels[i].position);
-    }
-#endif
+    restore_parser_state(&interpreter->parser, saved_state);
 }
-
-// void collect_labels(Interpreter* interpreter) {
-//     // Save current parser state
-//     int saved_pos = interpreter->parser.position;
-//     int saved_line = interpreter->parser.line;
-//     int saved_col = interpreter->parser.col;
-//
-//     // Reset to beginning
-//     interpreter->parser.position = 0;
-//     interpreter->parser.line = 1;
-//     interpreter->parser.col = 1;
-//     interpreter->label_count = 0;
-//
-//     // Scan for all [L][S][S] mark instructions
-//     while (interpreter->parser.position < interpreter->parser.length) {
-//         InstructionSequence seq = {0};
-//
-//         seq.first = parse_next_char(&interpreter->parser);
-//
-//         if (seq.first == LINEFEED) {
-//             seq.second = parse_next_char(&interpreter->parser);
-//
-//             if (seq.second == SPACE) {
-//                 seq.third = parse_next_char(&interpreter->parser);
-//
-//                 if (seq.third == SPACE) {
-//                     // Found a mark label instruction
-//                     int label = parse_label(&interpreter->parser);
-//                     fc_add_label(interpreter, label, interpreter->parser.position);
-//
-// #ifdef DEBUG
-//                     printf("DEBUG: Found label %d at position %d\n",
-//                            label, interpreter->parser.position);
-// #endif
-//                 }
-//             }
-//         }
-//     }
-//
-//     // Restore original parser state
-//     interpreter->parser.position = saved_pos;
-//     interpreter->parser.line = saved_line;
-//     interpreter->parser.col = saved_col;
-//
-// #ifdef DEBUG
-//     printf("DEBUG: Collected %d labels\n", interpreter->label_count);
-// #endif
-// }
 
 void interpreter_run(Interpreter* interpreter) {
     if (!interpreter->parser.source) {
