@@ -161,26 +161,6 @@ int interpreter_load_str(Interpreter* interpreter, const char* source) {
     return 0;
 }
 
-// char parse_next_char(ParserState *parser) {
-//     if (parser->position >= parser->length) {
-//         return EOF;
-//     }
-//
-//     char c = parser->source[parser->position++];
-//
-//     printf("Read char: '%c' (ASCII %d) at pos %d\n",
-//         c == '\n' ? '\\n' : c == ' ' ? 'S' : c == '\t' ? 'T' : c,
-//         c, parser->position - 1);
-//
-//     if (c == LINEFEED) {
-//         parser->line++;
-//         parser->col = 1;
-//     } else
-//         parser->col++;
-//
-//     return c;
-// }
-
 char parse_next_char(ParserState *parser) {
     while (parser->position < parser->length) {
         unsigned char c = parser->source[parser->position++];
@@ -209,16 +189,6 @@ char parse_peek_char(ParserState *parser) {
     }
 
     return parser->source[parser->position];
-}
-
-void parse_skip_ws(ParserState *parser) {
-    while (parser->position < parser->length) {
-        char c = parser->source[parser->position];
-        if (c == SPACE || c == TAB || c == LINEFEED)
-            parser->position++;
-        else
-            break;
-    }
 }
 
 int parse_number(ParserState *parser) {
@@ -292,44 +262,4 @@ int parse_label(ParserState *parser) {
     }
 
     return label;
-}
-
-void instr_push(Interpreter* interpreter) {
-    int value = parse_number(&interpreter->parser);
-    if (interpreter->running == false) return;
-    st_push(interpreter->stack, value);
-}
-
-void instr_duplicate(Interpreter* interpreter) {
-    if (interpreter->stack->top < 0) {
-        fprintf(stderr, "Duplicate: stack underflow at line %d\n",
-                interpreter->parser.line);
-        interpreter->running = false;
-        return;
-    }
-    int value = st_peek(interpreter->stack, 0);
-    st_push(interpreter->stack, value);
-}
-
-void instr_swap(Interpreter* interpreter) {
-    if (interpreter->stack->top < 1) {
-        fprintf(stderr, "Swap: stack underflow at line %d\n",
-                interpreter->parser.line);
-        interpreter->running = false;
-        return;
-    }
-    int a = st_pop(interpreter->stack);
-    int b = st_pop(interpreter->stack);
-    st_push(interpreter->stack, a);
-    st_push(interpreter->stack, b);
-}
-
-void instr_discard(Interpreter* interpreter) {
-    if (interpreter->stack->top < 0) {
-        fprintf(stderr, "Discard: stack underflow at line %d\n",
-                interpreter->parser.line);
-        interpreter->running = false;
-        return;
-    }
-    st_pop(interpreter->stack);
 }
