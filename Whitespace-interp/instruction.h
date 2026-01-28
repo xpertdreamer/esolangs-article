@@ -9,7 +9,6 @@
 
 void instr_push(Interpreter* interpreter);
 void instr_duplicate(Interpreter* interpreter);
-void instr_swap(Interpreter* interpreter);
 void instr_discard(Interpreter* interpreter);
 void instr_add(Interpreter* interpreter);
 void instr_sub(Interpreter* interpreter);
@@ -18,6 +17,9 @@ void instr_div(Interpreter* interpreter);
 void instr_mod(Interpreter* interpreter);
 void instr_heap_store(Interpreter* interpreter);
 void instr_heap_retrieve(Interpreter* interpreter);
+void instr_copy(Interpreter* interpreter);
+void instr_slide(Interpreter* interpreter);
+void instr_swap(Interpreter* interpreter);
 void instr_mark(Interpreter* interpreter);
 void instr_call_subroutine(Interpreter* interpreter);
 void instr_jump(Interpreter* interpreter);
