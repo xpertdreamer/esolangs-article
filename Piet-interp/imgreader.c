@@ -169,15 +169,14 @@ void print_image_info(const PietState* state) {
         }
     }
 
-    const char* color_names[] = {
-        "Light Red", "Light Yellow", "Light Green", "Light Cyan", "Light Blue", "Light Magenta",
-        "Red", "Yellow", "Green", "Cyan", "Blue", "Magenta",
-        "Dark Red", "Dark Yellow", "Dark Green", "Dark Cyan", "Dark Blue", "Dark Magenta",
-        "White", "Black", "Unknown"
-    };
-
     for (int i = 0; i < 21; i++) {
         if (colors_count[i] > 0) {
+            const char* color_names[] = {
+                "Light Red", "Light Yellow", "Light Green", "Light Cyan", "Light Blue", "Light Magenta",
+                "Red", "Yellow", "Green", "Cyan", "Blue", "Magenta",
+                "Dark Red", "Dark Yellow", "Dark Green", "Dark Cyan", "Dark Blue", "Dark Magenta",
+                "White", "Black", "Unknown"
+            };
             printf("%s: %d pixels\n", color_names[i], colors_count[i]);
         }
     }
