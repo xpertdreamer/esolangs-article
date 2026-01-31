@@ -59,3 +59,5 @@ typedef enum {
   P_CMD_OUT_CHAR,
   P_CMD_COUNT
 } PietCommand;
+
+#endif
