@@ -12,6 +12,9 @@ include_directories(${PNG_INCLUDE_DIRS} ${ZLIB_INCLUDE_DIRS} ${CMAKE_CURRENT_SOU
 add_executable(Piet_interp main.c
         log.c
         stack.c
+        png_loader.c
+        color.c
+        command.c
 )
 
 target_link_libraries(Piet_interp PRIVATE PNG::PNG)
