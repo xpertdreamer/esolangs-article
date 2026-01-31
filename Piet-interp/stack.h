@@ -9,23 +9,24 @@
 #define MAX_STACK_SIZE 65536
 
 #include <stdbool.h>
+#include <stdint.h>
 
 typedef struct {
-    int *data;
+    int64_t *data;
     int top;
     int capacity;
 } Stack;
 
-Stack* st_init(void);
+void st_init(Stack* stack);
 void st_free(Stack *s);
 bool st_clear(Stack *s);
 int st_size(const Stack *s);
 bool st_is_empty(const Stack *s);
 bool st_is_full(const Stack *s);
-bool st_push(Stack *s, int value);
-int st_pop(Stack *s);
-int st_peek(const Stack *s);
-bool st_roll(Stack *s, int depth, int rolls);
+bool st_push(Stack *s, int64_t value);
+int64_t st_pop(Stack *s);
+int64_t st_peek(const Stack *s);
+bool st_roll(Stack *s, int64_t depth, int64_t rolls);
 bool st_duplicate(Stack *s);
 bool st_swap(Stack *s);
 

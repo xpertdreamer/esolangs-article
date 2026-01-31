@@ -1,129 +1,59 @@
 //
 // Created by IWOFLEUR on 28.01.2026.
 //
-
 #include <stdlib.h>
-#include <stdio.h>
 #include <stdbool.h>
-#include <limits.h>
-
+#include <stdint.h>
 #include "stack.h"
-#include "log.h"
 
-// Internal helper macros
-#define CHECK_NULL(s) \
-    do { \
-        if ((s) == NULL) { \
-            PIET_ERROR("Stack is NULL\n"); \
-            return false; \
-        } \
-    } while(0)
-
-#define CHECK_NULL_INT(s) \
-    do { \
-        if ((s) == NULL) { \
-            PIET_ERROR("Stack is NULL\n"); \
-            return -1; \
-        } \
-    } while(0)
-
-#define CHECK_EMPTY(s) \
-    do { \
-        if (st_is_empty(s)) { \
-            PIET_ERROR("Stack is empty\n"); \
-            return false; \
-        } \
-    } while(0)
-
-#define CHECK_EMPTY_INT(s) \
-    do { \
-        if (st_is_empty(s)) { \
-            PIET_ERROR("Stack is empty\n"); \
-            return -1; \
-        } \
-    } while(0)
-
-Stack* st_init(void) {
-    Stack* s = malloc(sizeof(Stack));
-    if (s == NULL) return NULL;
-
-    s->capacity = INITIAL_CAPACITY;
-    s->top = -1;
-    s->data = malloc(s->capacity * sizeof(int));
-    if (s->data == NULL) {
-        free(s);
-        return NULL;
-    }
-
-    return s;
+void st_init(Stack* stack) {
+    stack->capacity = INITIAL_CAPACITY;
+    stack->top = -1;
+    stack->data = malloc(stack->capacity * sizeof(int64_t));
 }
 
 void st_free(Stack *s) {
     if (s == NULL) return;
-
     free(s->data);
-    s->data = NULL;
-    free(s);
+    // Note: don't free(s) here - piet_free handles that
 }
 
 bool st_clear(Stack *s) {
-    CHECK_NULL(s);
+    if (s == NULL) return false;
     s->top = -1;
     return true;
 }
 
 int st_size(const Stack *s) {
-    if (s == NULL) {
-        PIET_ERROR("Stack is NULL\n");
-        return -1;
-    }
+    if (s == NULL) return -1;
     return s->top + 1;
 }
 
 bool st_is_empty(const Stack *s) {
-    if (s == NULL) {
-        PIET_ERROR("Stack is NULL\n");
-        return true;
-    }
+    if (s == NULL) return true;
     return s->top == -1;
 }
 
 bool st_is_full(const Stack *s) {
-    if (s == NULL) {
-        PIET_ERROR("Stack is NULL\n");
-        return false;
-    }
+    if (s == NULL) return false;
     return st_size(s) >= MAX_STACK_SIZE;
 }
 
-bool st_push(Stack *s, int value) {
-    CHECK_NULL(s);
+bool st_push(Stack *s, int64_t value) {
+    if (s == NULL) return false;
 
-    // Check for stack overflow
     if (st_size(s) >= MAX_STACK_SIZE) {
-        PIET_ERROR("Stack overflow (max size: %d)\n", MAX_STACK_SIZE);
         return false;
     }
 
-    // Resize if needed
     if (st_size(s) >= s->capacity) {
-        // Check for integer overflow
-        if (s->capacity > INT_MAX / 2) {
-            PIET_ERROR("Capacity overflow\n");
-            return false;
-        }
-
         size_t new_capacity = s->capacity * 2;
-        // Cap at MAX_STACK_SIZE
         if (new_capacity > MAX_STACK_SIZE) {
             new_capacity = MAX_STACK_SIZE;
         }
 
-        int* new_data = realloc(s->data, new_capacity * sizeof(int));
-        if (new_data == NULL) {
-            PIET_ERROR("Memory allocation failed during stack resize\n");
-            return false;
-        }
+        int64_t* new_data = realloc(s->data, new_capacity * sizeof(int64_t));
+        if (new_data == NULL) return false;
 
         s->data = new_data;
         s->capacity = new_capacity;
@@ -134,45 +64,57 @@ bool st_push(Stack *s, int value) {
     return true;
 }
 
-int st_pop(Stack *s) {
-    CHECK_NULL_INT(s);
-    CHECK_EMPTY_INT(s);
-
+int64_t st_pop(Stack *s) {
+    if (s == NULL || st_is_empty(s)) {
+        return 0;
+    }
     return s->data[s->top--];
 }
 
-int st_peek(const Stack *s) {
-    CHECK_NULL_INT(s);
-    CHECK_EMPTY_INT(s);
-
+int64_t st_peek(const Stack *s) {
+    if (s == NULL || st_is_empty(s)) {
+        return 0;
+    }
     return s->data[s->top];
 }
 
-bool st_duplicate(Stack *s) {
-    CHECK_NULL(s);
-    CHECK_EMPTY(s);
-
-    int top_value = st_peek(s);
-    return st_push(s, top_value);
-}
-
-bool st_swap(Stack *s) {
-    CHECK_NULL(s);
-
-    if (st_size(s) < 2) {
-        PIET_ERROR("Cannot swap: stack needs at least 2 elements\n");
+bool st_roll(Stack *s, int64_t depth, int64_t rolls) {
+    if (s == NULL || depth <= 0 || st_size(s) < depth) {
         return false;
     }
 
-    int a = st_pop(s);
-    int b = st_pop(s);
+    // Normalize rolls
+    rolls = rolls % depth;
+    if (rolls < 0) rolls += depth;
+    if (rolls == 0) return true;
 
-    bool success = st_push(s, a);
-    if (!success) return false;
+    // Perform roll
+    int64_t *temp = malloc(depth * sizeof(int64_t));
+    for (int i = 0; i < depth; i++) {
+        temp[i] = s->data[s->top - depth + 1 + i];
+    }
 
-    return st_push(s, b);
+    // Rotate
+    for (int i = 0; i < depth; i++) {
+        int src_idx = (i - rolls + depth) % depth;
+        s->data[s->top - depth + 1 + i] = temp[src_idx];
+    }
+
+    free(temp);
+    return true;
 }
 
-bool st_roll(Stack *s, int depth, int rolls) {
-    // Leave it alone for now
+bool st_duplicate(Stack *s) {
+    if (s == NULL || st_is_empty(s)) return false;
+    return st_push(s, s->data[s->top]);
+}
+
+bool st_swap(Stack *s) {
+    if (s == NULL || st_size(s) < 2) return false;
+
+    int64_t a = s->data[s->top];
+    int64_t b = s->data[s->top - 1];
+    s->data[s->top] = b;
+    s->data[s->top - 1] = a;
+    return true;
 }
