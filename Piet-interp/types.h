@@ -34,7 +34,8 @@ typedef enum {
   P_MAGENTA,
   P_LIGHT_MAGENTA,
   P_DARK_MAGENTA,
-  P_COLOR_NON
+  P_COLOR_NON,
+  P_COLOR_COUNT
 } PietColor;
 
 typedef enum {
@@ -55,5 +56,6 @@ typedef enum {
   P_CMD_IN_NUM,
   P_CMD_IN_CHAR,
   P_CMD_OUT_NUM,
-  P_CMD_OUT_CHAR
+  P_CMD_OUT_CHAR,
+  P_CMD_COUNT
 } PietCommand;
