@@ -8,6 +8,7 @@
 #include "piet_io.h"
 #include <png.h>
 #include <string.h>
+#include <errno.h>
 
 /*
  *  Read Piet program from PNG file
@@ -48,7 +49,7 @@ int piet_read_png(const char* filename) {
 
     f = fopen(filename, "rb");
     if (f == NULL) {
-        eprintf("error: cannot open PNG file '%s' : %s\n", filename, stderr(errno));
+        eprintf("error: cannot open PNG file '%s' : %s\n", filename, strerror(errno));
         return -1;
     }
     if (fread(header, 1, 8, f) != 8) {
@@ -118,7 +119,7 @@ int piet_read_png(const char* filename) {
     piet_alloc_cells(width, height);
 
     for (row = 0; row < height; row++) {
-        png_bytep* pixel_row = row_pointers[row];
+        png_byte* pixel_row = row_pointers[row];
         for (col = 0; col < width; col++) {
             png_byte* pixel = &pixel_row[col * 3];
             int red = pixel[0];

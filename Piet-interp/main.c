@@ -62,7 +62,7 @@ void display_usage(const char *program_name) {
     fprintf(stderr, "  -e <steps>           Maximum execution steps (0 = unlimited)\n");
     fprintf(stderr, "  -uu                  Unknown colors cause error (default: treat as white)\n");
     fprintf(stderr, "  -ub                  Unknown colors treated as black\n");
-    fprintf(stderr, "  -cs <size>           Codel size in pixels (-1 = auto-detect, default)\n");
+    fprintf(stderr, "  -c <size>            Codel size in pixels (-1 = auto-detect, default)\n");
     fprintf(stderr, "  -ts <step>           Start tracing at specified step\n");
     fprintf(stderr, "  -te <step>           Stop tracing at specified step\n");
     fprintf(stderr, "\n");
@@ -94,11 +94,57 @@ int parse_arguments(int argc, char **argv) {
      *  optstring Definitions of the short options string for getopt
      *            Options with required arguments are followed by ':'s
      */
-    int opt;
+    int i;
     char *endptr;
     long value;
-    const char *optstring = "hvqtdub:e:cs:v11ts:te:";
-    optind = 1;
+
+    // First pass: handle special combined options that getopt doesn't handle well
+    for (i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-uu") == 0) {
+            unknown_color = -1;
+            vprintf("info: unknown colors will cause errors (-uu)\n");
+            // Remove this argument by shifting the rest
+            for (int j = i; j < argc - 1; j++) {
+                argv[j] = argv[j + 1];
+            }
+            argc--;
+            i--;
+        } else if (strcmp(argv[i], "-ub") == 0) {
+            unknown_color = 0;
+            vprintf("info: unknown colors treated as black (-ub)\n");
+            // Remove this argument by shifting the rest
+            for (int j = i; j < argc - 1; j++) {
+                argv[j] = argv[j + 1];
+            }
+            argc--;
+            i--;
+        } else if (strncmp(argv[i], "-c", 2) == 0 && strlen(argv[i]) > 2 && isdigit(argv[i][2])) {
+            // Handle -c<value> format (e.g., -c5, -c-1)
+            value = strtol(argv[i] + 2, &endptr, 10);
+            if (*endptr != '\0' || value < -1) {
+                eprintf("error: invalid value for -c: %s\n", argv[i] + 2);
+                return -1;
+            }
+            codel_size = (int)value;
+            if (codel_size == 0) {
+                eprintf("warning: codel size 0 is invalid, using 1\n");
+                codel_size = 1;
+            }
+            vprintf("info: codel size set to %d\n", codel_size);
+
+            // Remove this argument by shifting the rest
+            for (int j = i; j < argc - 1; j++) {
+                argv[j] = argv[j + 1];
+            }
+            argc--;
+            i--;
+        }
+    }
+
+    // Now parse remaining arguments with getopt
+    const char *optstring = "hvqtde:c:ts:te:";
+    int opt;
+    optind = 1; // Reset optind
 
     while ((opt = getopt(argc, argv, optstring)) != -1) {
         switch (opt) {
@@ -132,38 +178,6 @@ int parse_arguments(int argc, char **argv) {
                 break;
             }
 
-            case 'u': {
-                // Check if next character is 'u' or 'b'
-                if (optarg && strcmp(optarg, "u") == 0) {
-                    unknown_color = -1;
-                    vprintf("info: unknown colors will cause errors (-uu)\n");
-                } else if (optarg && strcmp(optarg, "b") == 0) {
-                    unknown_color = 0;
-                    vprintf("info: unknown colors treated as black (-ub)\n");
-                } else {
-                    // Handle -u without following character (old style)
-                    // Check if next argument is 'u' or 'b'
-                    if (optind < argc) {
-                        if (strcmp(argv[optind], "u") == 0) {
-                            unknown_color = -1;
-                            vprintf("info: unknown colors will cause errors (-u u)\n");
-                            optind++;
-                        } else if (strcmp(argv[optind], "b") == 0) {
-                            unknown_color = 0;
-                            vprintf("info: unknown colors treated as black (-u b)\n");
-                            optind++;
-                        } else {
-                            eprintf("error: -u must be followed by 'u' or 'b'\n");
-                            return -1;
-                        }
-                    } else {
-                        eprintf("error: -u requires an argument (u or b)\n");
-                        return -1;
-                    }
-                }
-                break;
-            }
-
             case 'e': {
                 value = strtol(optarg, &endptr, 10);
                 if (*endptr != '\0' || value < 0) {
@@ -176,51 +190,23 @@ int parse_arguments(int argc, char **argv) {
             }
 
             case 'c': {
-                // Check if next argument is 's' for codel size
-                if (optarg && strcmp(optarg, "s") == 0) {
-                    // -cs option with argument
-                    if (optind < argc && isdigit(argv[optind][0])) {
-                        value = strtol(argv[optind], &endptr, 10);
-                        if (*endptr != '\0' || value < -1) {
-                            eprintf("error: invalid value for -cs: %s\n", argv[optind]);
-                            return -1;
-                        }
-                        codel_size = (int)value;
-                        if (codel_size == 0) {
-                            eprintf("warning: codel size 0 is invalid, using 1\n");
-                            codel_size = 1;
-                        }
-                        vprintf("info: codel size set to %d\n", codel_size);
-                        optind++;
-                    } else {
-                        eprintf("error: -cs requires a numeric argument\n");
-                        return -1;
-                    }
-                } else {
-                    // Handle old-style -c <size>
-                    if (optind < argc && isdigit(argv[optind][0])) {
-                        value = strtol(argv[optind], &endptr, 10);
-                        if (*endptr != '\0' || value < -1) {
-                            eprintf("error: invalid value for -c: %s\n", argv[optind]);
-                            return -1;
-                        }
-                        codel_size = (int)value;
-                        if (codel_size == 0) {
-                            eprintf("warning: codel size 0 is invalid, using 1\n");
-                            codel_size = 1;
-                        }
-                        vprintf("info: codel size set to %d (-c option)\n", codel_size);
-                        optind++;
-                    } else {
-                        eprintf("error: -c requires a numeric argument\n");
-                        return -1;
-                    }
+                // Handle -c <size>
+                value = strtol(optarg, &endptr, 10);
+                if (*endptr != '\0' || value < -1) {
+                    eprintf("error: invalid value for -c: %s\n", optarg);
+                    return -1;
                 }
+                codel_size = (int)value;
+                if (codel_size == 0) {
+                    eprintf("warning: codel size 0 is invalid, using 1\n");
+                    codel_size = 1;
+                }
+                vprintf("info: codel size set to %d\n", codel_size);
                 break;
             }
 
             case 's': {
-                // Trace start step
+                // -ts <step> (trace start)
                 value = strtol(optarg, &endptr, 10);
                 if (*endptr != '\0' || value < 0) {
                     eprintf("error: invalid value for -ts: %s\n", optarg);
