@@ -5,6 +5,8 @@
 #include "piet_common.h"
 #include "piet_color.h"
 
+#include <stdio.h>
+
 /*
  *  Complete table of all Piet colors with RGB values and names
  *  Organized by lightness (light, normal, dark) then by hue
@@ -41,3 +43,95 @@ piet_color_t piet_colors[] = {
     { 0x000000, "black",         "BB", C_BLACK }   //  black
 };
 
+/*
+ *  Convert RGB color value to internal Piet color index
+ *  rgb_color 24-bit RGB color value in 0xRRGGBB hexadecimal format
+ *  Internal color index (0-19) if color is recognized
+ *  -1 if color is not found in Piet color table
+ *  Input images may contain colors not in Piet palette -> unknown_color configuration
+ */
+int piet_get_color_idx(int rgb_color) {
+    for (int i = 0; i < N_COLORS; i++) {
+        if (rgb_color == piet_colors[i].col)
+            return piet_colors[i].c_idx;
+    }
+    return -1;
+}
+
+/*
+ *  Convert internal color index to short string representation
+ *  color_idx Internal color index (0-19) or C_MARK_INDEX
+ *  Pointer to 2-character string constant representing the color
+ *  "II" for C_MARK_INDEX (temporary fill marker)
+ *  "??" for unknown/invalid color indices
+ *  Used for debug output and tracing
+ */
+const char *piet_cell_to_str(int color_idx) {
+    if (color_idx == C_MARK_INDEX)
+        return "II";
+
+    for (int i = 0; i < N_COLORS; i++) {
+        if (color_idx == piet_colors[i].c_idx)
+            return piet_colors[i].s_name;
+    }
+
+    eprintf("warning: unknown color index %d in piet_cell_to_str()\n", color_idx);
+    return "??";
+}
+
+/*
+ *  Extract hue component from color index
+ *  color_idx Internal color index
+ *  Hue value (0-5) for regular colors, or C_WHITE/C_BLACK for specials
+ *  Returns -1 for invalid color indices
+ */
+int piet_get_hue(int color_idx) {
+    if (color_idx < C_WHITE)
+        return color_idx % N_HUE;
+
+    if (color_idx == C_BLACK || color_idx == C_WHITE)
+        return color_idx;
+
+    eprintf("error: unknown color index %d in piet_get_hue()\n", color_idx);
+    return -1;
+}
+
+/*
+ *  Extract lightness component from color index
+ *  color_idx Internal color index
+ *  Lightness value (0=light, 1=normal, 2=dark) for regular colors
+ *  Returns -1 for white, black, or invalid color indices
+ */
+int piet_get_light(int color_idx) {
+    if (color_idx < C_WHITE)
+        return color_idx / N_HUE;
+
+    return -1;
+}
+
+/*
+ *  Check if color index represents white
+ *  color_idx Internal color index to check
+ *  1 if color is white, 0 otherwise
+ */
+int piet_is_white(int color_idx) {
+    return color_idx == C_WHITE;
+}
+
+/*
+ *  Check if color index represents black
+ *  color_idx Internal color index to check
+ *  1 if color is black, 0 otherwise
+ */
+int piet_is_black(int color_idx) {
+    return color_idx == C_BLACK;
+}
+
+/*
+ *  Check if color index represents a regular Piet color (not white/black)
+ *  color_idx Internal color index to check
+ *  1 if regular color (0-17), 0 if white, black, or invalid
+ */
+int piet_is_color(int color_idx) {
+    return color_idx >= 0 && color_idx < C_WHITE;
+}
