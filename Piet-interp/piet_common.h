@@ -5,6 +5,9 @@
 #ifndef PIET_COMMON_H
 #define PIET_COMMON_H
 
+#include <stdio.h>
+#include <stdlib.h>
+
 #define PIET_VERSION "0.0.1"
 #define PIET_AUTHOR "Based on npiet by Erik Schoenfelder"
 
@@ -18,34 +21,45 @@
 // Uncomment to enable execution trace output macros
 #define TRACE_ENABLED
 
-#ifdef DEBUG_ENABLED
-// Print debug messages when debug flag is non-zero
-#define dprintf(...) do { if (debug) printf(__VA_ARGS__); } while(0)
-// Print verbose debug messages when debug flag > 1
-#define d2printf(...)   do { if (debug > 1) printf(__VA_ARGS__); } while(0)
+// Helper macro to handle variable arguments in macros
+// This works with both GNU C and standard C
+#ifdef __GNUC__
+    #define VPRINTF_HELPER(fmt, ...) printf(fmt, ##__VA_ARGS__)
+    #define EPRINTF_HELPER(fmt, ...) fprintf(stderr, fmt, ##__VA_ARGS__)
 #else
-// When DEBUG_ENABLED is not defined, debug macros expand to nothing
-#define dprintf(...)    ((void)0)
-#define d2printf(...)   ((void)0)
+    // For non-GNU compilers, use a different approach
+    #define VPRINTF_HELPER(fmt, ...) printf(fmt __VA_OPT__(,) __VA_ARGS__)
+    #define EPRINTF_HELPER(fmt, ...) fprintf(stderr, fmt __VA_OPT__(,) __VA_ARGS__)
+#endif
+
+#ifdef DEBUG_ENABLED
+    // Print debug messages when debug flag is non-zero
+    #define dprintf(fmt, ...) do { if (debug) VPRINTF_HELPER(fmt, ##__VA_ARGS__); } while(0)
+    // Print verbose debug messages when debug flag > 1
+    #define d2printf(fmt, ...) do { if (debug > 1) VPRINTF_HELPER(fmt, ##__VA_ARGS__); } while(0)
+#else
+    // When DEBUG_ENABLED is not defined, debug macros expand to nothing
+    #define dprintf(fmt, ...) ((void)0)
+    #define d2printf(fmt, ...) ((void)0)
 #endif
 
 #ifdef TRACE_ENABLED
-// Print trace messages when trace is enabled and step is in range
-#define tprintf(...)    do { if (trace && exec_step >= trace_start && \
-                        exec_step <= trace_end) printf(__VA_ARGS__); } while(0)
-// Print detailed trace messages when trace > 1
-#define t2printf(...)   do { if (trace > 1) printf(__VA_ARGS__); } while(0)
+    // Print trace messages when trace is enabled and step is in range
+    #define tprintf(fmt, ...) do { if (trace && exec_step >= trace_start && \
+                                 exec_step <= trace_end) VPRINTF_HELPER(fmt, ##__VA_ARGS__); } while(0)
+    // Print detailed trace messages when trace > 1
+    #define t2printf(fmt, ...) do { if (trace > 1) VPRINTF_HELPER(fmt, ##__VA_ARGS__); } while(0)
 #else
-// When TRACE_ENABLED is not defined, trace macros expand to nothing
-    #define tprintf(...)    ((void)0)
-    #define t2printf(...)   ((void)0)
+    // When TRACE_ENABLED is not defined, trace macros expand to nothing
+    #define tprintf(fmt, ...) ((void)0)
+    #define t2printf(fmt, ...) ((void)0)
 #endif
 
 // Print verbose informational messages
-#define vprintf(...)    do { if (verbose) printf(__VA_ARGS__); } while(0)
+#define vprintf(fmt, ...) do { if (verbose) VPRINTF_HELPER(fmt, ##__VA_ARGS__); } while(0)
 
 // Print error messages to stderr
-#define eprintf(...)    do { fprintf(stderr, __VA_ARGS__); } while(0)
+#define eprintf(fmt, ...) do { EPRINTF_HELPER(fmt, ##__VA_ARGS__); } while(0)
 
 /*
  * Some mathematical helpers here
@@ -61,10 +75,10 @@
 #define MIN(a,b) (((a) < (b)) ? (a) : (b))
 
 // Get sign of value (-1, 0, 1)
-#define SIGN(x) ((x) < 0 ? -1 : ((x) > 0 ? 1 : 0)
+#define SIGN(x) ((x) < 0 ? -1 : ((x) > 0 ? 1 : 0))
 
 /*
- * Memory managment macros
+ * Memory management macros
  */
 
 /*
@@ -105,7 +119,7 @@
     } while (0)
 
 /*
- *  Global conviguration variables
+ *  Global configuration variables
  */
 
 // Enable verbose output mode (non-zero = enabled)
