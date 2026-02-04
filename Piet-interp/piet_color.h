@@ -114,4 +114,14 @@ int piet_is_black(int color_idx);
  *  1 if regular color (0-17), 0 if white, black, or invalid
  */
 int piet_is_color(int color_idx);
+
+/*
+ *  Convert internal color index to short string representation
+ *  color_idx Internal color index (0-19) or C_MARK_INDEX
+ *  Pointer to 2-character string constant representing the color
+ *  "II" for C_MARK_INDEX (temporary fill marker)
+ *  "??" for unknown/invalid color indices
+ *  Used for debug output and tracing
+ */
+const char *piet_cell_to_str(int color_idx);
 #endif //PIET_COLOR_H
