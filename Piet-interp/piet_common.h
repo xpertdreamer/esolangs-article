@@ -139,7 +139,7 @@ extern int codel_size;
 extern char *input_filename;
 
 // Current execution step counter
-extern int exec_step;
+extern unsigned exec_step;
 
 // First execution step to include in trace output
 extern unsigned trace_start;
