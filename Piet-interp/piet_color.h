@@ -124,4 +124,13 @@ int piet_is_color(int color_idx);
  *  Used for debug output and tracing
  */
 const char *piet_cell_to_str(int color_idx);
+
+/*
+ *  Convert RGB color value to internal Piet color index
+ *  rgb_color 24-bit RGB color value in 0xRRGGBB hexadecimal format
+ *  Internal color index (0-19) if color is recognized
+ *  -1 if color is not found in Piet color table
+ *  Input images may contain colors not in Piet palette -> unknown_color configuration
+ */
+int piet_get_color_idx(int rgb_color);
 #endif //PIET_COLOR_H
