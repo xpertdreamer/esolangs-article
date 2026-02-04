@@ -94,7 +94,7 @@
  */
 #define SAFE_REALLOC(ptr, type, count) \
     do { \
-        (type)* temp = (type *)realloc((ptr), (count) * sizeof(type)); \
+        type* temp = (type *)realloc((ptr), (count) * sizeof(type)); \
         if (!(temp)) { \
             eprintf("fatal: memory reallocation failed for " #ptr " (%d bytes)\n", \
                     (int)((count) * sizeof(type))); \
