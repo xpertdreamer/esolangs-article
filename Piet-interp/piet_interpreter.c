@@ -697,6 +697,14 @@ int piet_run(void) {
     while (1) {
         t2printf("trace: state: pos=(%d,%d) DP=%c CC=%c\n",
                p_xpos, p_ypos, p_dir_pointer, p_codel_chooser);
+
+        if (exec_step > MAX_STEPS) {
+            eprintf("\nerror: possible infinite loop detected after %lu steps\n", exec_step);
+            eprintf("       (last position: %d,%d DP=%c CC=%c)\n",
+                    p_xpos, p_ypos, p_dir_pointer, p_codel_chooser);
+            return 0;
+        }
+
         if (piet_step() < 0) {
             vprintf("\ninfo: program terminated after %u steps\n", exec_step);
             break;

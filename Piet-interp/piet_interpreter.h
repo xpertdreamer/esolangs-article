@@ -5,6 +5,8 @@
 #ifndef PIET_INTERPRETER_H
 #define PIET_INTERPRETER_H
 
+#define MAX_STEPS 1000
+
 /*
  * Direction constants for dp (direction pointer)
  * 4 directions according to Piet specification
