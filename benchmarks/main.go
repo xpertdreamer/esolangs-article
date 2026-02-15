@@ -10,20 +10,22 @@ import (
 	"time"
 )
 
-func resume(w io.Writer, pietRes []time.Duration, wsRes []time.Duration) {
+type BenchResult struct {
+	Name    string
+	AvgDur  time.Duration
+	CPUTime time.Duration
+	MaxRAM  int64
+}
+
+func resume(w io.Writer, results []BenchResult) {
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Resume:")
-	fmt.Fprintf(w, "%-12s", "Whitespace: ")
-	for i := range len(wsRes) {
-		fmt.Fprintf(w, "%.10v\t", wsRes[i])
+	fmt.Fprintf(w, "%-15s | %-15s | %-15s | %-10s\n", "Language", "Avg Duration", "CPU Time", "Max RAM")
+	fmt.Fprintln(w, strings.Repeat("-", 65))
+	for i, r := range results {
+		fmt.Fprintf(w, "%d %.13s | %-15.10v | %-15.10v | %d KB\n",
+			i, r.Name, r.AvgDur, r.CPUTime, r.MaxRAM)
 	}
-	fmt.Fprintln(w)
-
-	fmt.Fprintf(w, "%-12s", "Piet: ")
-	for i := range pietRes {
-		fmt.Fprintf(w, "%.10v\t", pietRes[i])
-	}
-	fmt.Fprintln(w)
 }
 
 func main() {
@@ -51,17 +53,16 @@ func main() {
 	defer f.Close()
 
 	multi := io.MultiWriter(os.Stdout, f)
-
-	wsSum := []time.Duration{}
-	pietSum := []time.Duration{}
+	var finalResults []BenchResult
 
 	runBench := func(name, exe, arg string, useInput bool) {
-		fmt.Printf("\n%s test:\n", name)
+		fmt.Printf("\n%s test (%s):\n", name, arg)
 
-		var total time.Duration
+		var totalDur, totalCPU time.Duration
+		var maxMem int64
 		results := make([]time.Duration, 0, iterations)
 
-		for i := range iterations {
+		for i := 0; i < iterations; i++ {
 			cmd := exec.Command(exe, arg)
 			if useInput {
 				cmd.Stdin = strings.NewReader(inputData)
@@ -73,24 +74,30 @@ func main() {
 			}
 			elapsed := time.Since(start)
 
-			total += elapsed
+			state := cmd.ProcessState
+			totalDur += elapsed
+			totalCPU += state.UserTime() + state.SystemTime()
+
+			currentMem := getMaxMemory(cmd)
+			if currentMem > maxMem {
+				maxMem = currentMem
+			}
+
 			if verbose {
 				results = append(results, elapsed)
 			}
 		}
 
-		avg := total / time.Duration(iterations)
+		avgDur := totalDur / time.Duration(iterations)
+		avgCPU := totalCPU / time.Duration(iterations)
 
-		if verbose {
-			fmt.Printf("Full measurements: %v\n", results)
-		}
-		switch name {
-		case "Whitespace":
-			wsSum = append(wsSum, avg)
-		case "Piet":
-			pietSum = append(pietSum, avg)
-		}
-		fmt.Printf("Avg: %v\n", avg)
+		finalResults = append(finalResults, BenchResult{
+			Name:    name + " (" + arg + ")",
+			AvgDur:  avgDur,
+			CPUTime: avgCPU,
+			MaxRAM:  maxMem,
+		})
+		fmt.Printf("Avg: %v | CPU: %v | Max RAM: %d KB\n", avgDur, avgCPU, maxMem)
 	}
 
 	fmt.Printf("Benchmark start: %s\n", time.Now().Format("15:04:05"))
@@ -98,6 +105,7 @@ func main() {
 	runBench("Whitespace", wsPath, wsArg1, true)
 	runBench("Piet", pietPath, pietArg2, false)
 	runBench("Whitespace", wsPath, wsArg2, false)
-	resume(multi, pietSum, wsSum)
+
+	resume(multi, finalResults)
 	fmt.Printf("\nBenchmark end: %s\n", time.Now().Format("15:04:05"))
 }
