@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -31,7 +32,8 @@ func resume(w io.Writer, results []BenchResult) {
 func main() {
 	const (
 		verbose    = true
-		iterations = 100
+		iterations = 1000
+		timeout    = 10 * time.Second
 		logFile    = "benchmark.log"
 
 		pietPath = "./../Piet-interp/cmake-build-debug/Piet_interp.exe"
@@ -39,16 +41,20 @@ func main() {
 
 		pietArg1 = "../Piet-interp/examples/fib.png"
 		pietArg2 = "../Piet-interp/examples/Countdown.png"
+		pietArg3 = "../Piet-interp/examples/p.png"
+		pietArg4 = "../Piet-interp/examples/piet_factorial_big.png"
 
 		wsArg1 = "../Whitespace-interp/examples/fibonacci.ws"
 		wsArg2 = "../Whitespace-interp/examples/count.ws"
+		wsArg3 = "../Whitespace-interp/examples/h.ws"
+		wsArg4 = "../Whitespace-interp/examples/fact.ws"
 
 		inputData = "14\n"
 	)
 
 	f, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		log.Fatalf("Error opening log file: %v", err)
+		log.Fatalf("Error: %v", err)
 	}
 	defer f.Close()
 
@@ -60,44 +66,47 @@ func main() {
 
 		var totalDur, totalCPU time.Duration
 		var maxMem int64
-		results := make([]time.Duration, 0, iterations)
+		var successCount int64
 
 		for i := 0; i < iterations; i++ {
-			cmd := exec.Command(exe, arg)
+			ctx, cancel := context.WithTimeout(context.Background(), timeout)
+			cmd := exec.CommandContext(ctx, exe, arg)
 			if useInput {
 				cmd.Stdin = strings.NewReader(inputData)
 			}
 
 			start := time.Now()
-			if err := cmd.Run(); err != nil {
-				log.Fatalf("Error at %d: %v", i, err)
-			}
+			err := cmd.Run()
 			elapsed := time.Since(start)
+			cancel()
+
+			if err != nil {
+				continue
+			}
 
 			state := cmd.ProcessState
 			totalDur += elapsed
 			totalCPU += state.UserTime() + state.SystemTime()
+			successCount++
 
 			currentMem := getMaxMemory(cmd)
 			if currentMem > maxMem {
 				maxMem = currentMem
 			}
-
-			if verbose {
-				results = append(results, elapsed)
-			}
 		}
 
-		avgDur := totalDur / time.Duration(iterations)
-		avgCPU := totalCPU / time.Duration(iterations)
+		if successCount > 0 {
+			avgDur := totalDur / time.Duration(successCount)
+			avgCPU := totalCPU / time.Duration(successCount)
 
-		finalResults = append(finalResults, BenchResult{
-			Name:    name + " (" + arg + ")",
-			AvgDur:  avgDur,
-			CPUTime: avgCPU,
-			MaxRAM:  maxMem,
-		})
-		fmt.Printf("Avg: %v | CPU: %v | Max RAM: %d KB\n", avgDur, avgCPU, maxMem)
+			finalResults = append(finalResults, BenchResult{
+				Name:    name + " (" + arg + ")",
+				AvgDur:  avgDur,
+				CPUTime: avgCPU,
+				MaxRAM:  maxMem,
+			})
+			fmt.Printf("Avg: %v | CPU: %v | Max RAM: %d KB (Success: %d/%d)\n", avgDur, avgCPU, maxMem, successCount, iterations)
+		}
 	}
 
 	fmt.Printf("Benchmark start: %s\n", time.Now().Format("15:04:05"))
@@ -105,6 +114,10 @@ func main() {
 	runBench("Whitespace", wsPath, wsArg1, true)
 	runBench("Piet", pietPath, pietArg2, false)
 	runBench("Whitespace", wsPath, wsArg2, false)
+	runBench("Piet", pietPath, pietArg3, false)
+	runBench("Whitespace", wsPath, wsArg3, false)
+	runBench("Piet", pietPath, pietArg4, true)
+	runBench("Whitespace", wsPath, wsArg4, true)
 
 	resume(multi, finalResults)
 	fmt.Printf("\nBenchmark end: %s\n", time.Now().Format("15:04:05"))
