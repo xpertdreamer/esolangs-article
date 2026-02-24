@@ -19,9 +19,9 @@ typedef struct {
 
 static const Instruction instruction_table[] = {
     // STACK
-    {2, {SPACE,     SPACE},                             instr_push,             true},    // Push number
-    {3, {SPACE,     TAB,        SPACE},                 instr_copy,             true},    // Copy nth item (ADDED)
-    {3, {SPACE,     TAB,        LINEFEED},              instr_slide,            true},    // Slide n items (ADDED)
+    {2, {SPACE,     SPACE},                             instr_push,             true},    
+    {3, {SPACE,     TAB,        SPACE},                 instr_copy,             true},    
+    {3, {SPACE,     TAB,        LINEFEED},              instr_slide,            true},    
     {3, {SPACE,     LINEFEED,   SPACE},                 instr_duplicate,        false},
     {3, {SPACE,     LINEFEED,   TAB},                   instr_swap,             false},
     {3, {SPACE,     LINEFEED,   LINEFEED},              instr_discard,          false},
